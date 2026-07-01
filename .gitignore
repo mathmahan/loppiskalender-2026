@@ -1,0 +1,9 @@
+# Source magazine (copyrighted) — kept local, not published
+Antikt-och-loppisguiden-2026.pdf
+
+# OS / tooling
+.DS_Store
+.claude/
+venv/
+__pycache__/
+*.pyc
