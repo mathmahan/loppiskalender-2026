@@ -359,8 +359,8 @@ header p{margin:0;opacity:.9;font-size:14px}
 .tab{padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);cursor:pointer;font-size:14px}
 .tab.active{background:var(--accent);color:#04121f;border-color:var(--accent);font-weight:600}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;align-items:start}
-@media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.grid{grid-template-columns:1fr}}
+@media(max-width:1000px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)}}
 .daycol{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .daycol h3{margin:0;padding:11px 12px;background:var(--accent2);color:#fff;font-size:15px;line-height:1.35}
 .daycol .body{padding:6px 8px}
@@ -384,6 +384,33 @@ tr:hover td{background:#163254}
 .legend{font-size:12px;color:var(--muted);margin:10px 0}
 .legend b{color:var(--ink)}
 a{color:var(--accent)}
+/* day picker (week view on phones) */
+.daypicker{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.daychip{flex:1 1 auto;min-width:44px;min-height:46px;padding:6px 8px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font-size:15px;cursor:pointer;text-align:center;line-height:1.15}
+.daychip .dc{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.daychip.active{background:var(--accent);color:#04121f;border-color:var(--accent);font-weight:700}
+.daychip.active .dc{color:#04121f}
+.daypanel{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.daypanel h3{margin:0;padding:12px 14px;background:var(--accent2);color:#fff;font-size:16px}
+.daypanel .body{padding:6px 12px}
+/* cards (list view on phones) */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.card .cn{font-weight:700;font-size:15px}
+.card .cmeta{color:var(--muted);font-size:12.5px;margin:2px 0 5px}
+.card .chrs{font-size:13.5px}
+.card .chrs b{color:var(--accent)}
+.card .caddr{color:var(--muted);font-size:12px;margin-top:5px}
+@media(max-width:760px){
+  body{font-size:15px}
+  #grid{display:block}
+  .controls{gap:8px;padding:10px 0}
+  #q,.controls select{flex:1 1 100%;width:100%;font-size:16px;min-height:46px}
+  .tab{flex:1 1 auto;text-align:center;min-height:46px;font-size:15px}
+  .item{padding:9px 6px;font-size:14px}
+  .item .hr{font-size:13px}
+  .item .mu{font-size:12px}
+  .section-title{font-size:17px}
+}
 </style>
 </head>
 <body>
@@ -453,22 +480,32 @@ function filtered(){
   });
 }
 function sortMs(ms){ return ms.slice().sort((a,b)=>a.mun.localeCompare(b.mun,'sv')||a.num-b.num); }
+function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
+
+// weekday of "today" -> our key order (JS getDay: 0=Sun..6=Sat)
+const DAYMAP=['sun','mon','tue','wed','thu','fri','sat'];
+let selectedDay=DAYMAP[new Date().getDay()];
+
+function openItemHtml(m,key){
+  return '<div class="item"><div class="nm">'+esc(m.name)+(m.season?' <span class="badge">säsong</span>':'')+'</div>'+
+         '<div class="hr">'+esc(m.days[key])+'</div>'+
+         '<div class="mu">'+esc(m.mun)+' · '+esc(m.region)+linksHtml(m)+'</div></div>';
+}
+function fullHours(m){
+  let hrs=''; const dk=Object.keys(m.days||{});
+  if(dk.length){
+    hrs = WD.filter(([k])=>m.days[k]).map(([k,l])=>'<b>'+l.slice(0,3)+'</b> '+esc(m.days[k])).join(' · ');
+    if(m.season) hrs+='<div class="note">'+esc(m.season)+'</div>';
+  } else if(m.season){ hrs='<div class="note">'+esc(m.season)+'</div>'; }
+  if(m.special) hrs+='<div class="note">'+esc(m.special)+'</div>';
+  if(!hrs) hrs='<span class="note">–</span>';
+  return hrs;
+}
 
 function renderWeek(){
   const ms=sortMs(filtered());
-  grid.innerHTML='';
-  WD.forEach(([key,label])=>{
-    const open=ms.filter(m=>m.days && m.days[key]);
-    const col=document.createElement('div'); col.className='daycol';
-    let inner='<h3>'+label+' <span class="count">('+open.length+')</span></h3><div class="body">';
-    if(!open.length) inner+='<div class="item note">–</div>';
-    open.forEach(m=>{
-      inner+='<div class="item"><div class="nm">'+esc(m.name)+(m.season?' <span class="badge">säsong</span>':'')+'</div>'+
-             '<div class="hr">'+esc(m.days[key])+'</div>'+
-             '<div class="mu">'+esc(m.mun)+' · '+esc(m.region)+linksHtml(m)+'</div></div>';
-    });
-    inner+='</div>'; col.innerHTML=inner; grid.appendChild(col);
-  });
+  if(isMobile()) renderWeekMobile(ms); else renderWeekGrid(ms);
+  // rolling/announced + N/A sections (shared by both layouts)
   const sp=sortMs(ms.filter(m=>!Object.keys(m.days||{}).length && !isNA(m) && (m.special||m.season)));
   specialsEl.innerHTML = sp.length? sp.map(m=>'• <b>'+esc(m.name)+'</b> ('+esc(m.mun)+'): '+esc(m.special||m.season)+' '+linksHtml(m)).join('<br>') : 'Inga i nuvarande filter.';
   spcount.textContent='('+sp.length+')';
@@ -476,10 +513,37 @@ function renderWeek(){
   naEl.innerHTML = na.length? na.map(m=>'• <b>'+esc(m.name)+'</b> ('+esc(m.mun)+' · '+esc(m.typ||'')+') '+linksHtml(m)).join('<br>') : 'Inga i nuvarande filter.';
   nacount.textContent='('+na.length+')';
 }
+function renderWeekGrid(ms){
+  grid.innerHTML='';
+  WD.forEach(([key,label])=>{
+    const open=ms.filter(m=>m.days && m.days[key]);
+    const col=document.createElement('div'); col.className='daycol';
+    let inner='<h3>'+label+' <span class="count">('+open.length+')</span></h3><div class="body">';
+    if(!open.length) inner+='<div class="item note">–</div>';
+    open.forEach(m=>inner+=openItemHtml(m,key));
+    inner+='</div>'; col.innerHTML=inner; grid.appendChild(col);
+  });
+}
+function renderWeekMobile(ms){
+  const counts={}; WD.forEach(([k])=>counts[k]=ms.filter(m=>m.days&&m.days[k]).length);
+  if(!WD.some(([k])=>k===selectedDay)) selectedDay=DAYMAP[new Date().getDay()];
+  let chips='<div class="daypicker">'+WD.map(([k,l])=>
+      '<button class="daychip'+(k===selectedDay?' active':'')+'" data-day="'+k+'"><span class="dc">'+l.slice(0,3)+'</span>'+counts[k]+'</button>').join('')+'</div>';
+  const label=WD.find(([k])=>k===selectedDay)[1];
+  const open=ms.filter(m=>m.days&&m.days[selectedDay]);
+  let panel='<div class="daypanel"><h3>'+label+' <span class="count">('+open.length+' öppna)</span></h3><div class="body">';
+  panel += open.length? open.map(m=>openItemHtml(m,selectedDay)).join('') : '<div class="item note">Inga butiker med fasta tider denna dag.</div>';
+  panel+='</div></div>';
+  grid.innerHTML=chips+panel;
+  grid.querySelectorAll('.daychip').forEach(b=>b.onclick=()=>{ selectedDay=b.dataset.day; renderWeek(); });
+}
 
 function renderList(){
   const ms=filtered();
   const regions=['Skåne & Blekinge','Småland','Halland'];
+  if(isMobile()) renderListMobile(ms,regions); else renderListDesktop(ms,regions);
+}
+function renderListDesktop(ms,regions){
   let html='';
   regions.forEach(r=>{
     const rows=sortMs(ms.filter(m=>m.region===r));
@@ -487,19 +551,27 @@ function renderList(){
     html+='<h2 class="section-title">'+r+' <span class="count">('+rows.length+')</span></h2>';
     html+='<table><thead><tr><th>#</th><th>Butik</th><th>Kommun</th><th>Typ</th><th>Öppettider</th><th>Adress / länkar</th></tr></thead><tbody>';
     rows.forEach(m=>{
-      let hrs='';
-      const dk=Object.keys(m.days||{});
-      if(dk.length){
-        hrs = WD.filter(([k])=>m.days[k]).map(([k,l])=>'<b>'+l.slice(0,3)+'</b> '+esc(m.days[k])).join(' · ');
-        if(m.season) hrs+='<div class="note">'+esc(m.season)+'</div>';
-      } else if(m.season){ hrs='<div class="note">'+esc(m.season)+'</div>'; }
-      if(m.special) hrs+='<div class="note">'+esc(m.special)+'</div>';
-      if(!hrs) hrs='<span class="note">–</span>';
       html+='<tr><td>'+m.num+'</td><td><b>'+esc(m.name)+'</b></td><td>'+esc(m.mun)+'</td>'+
-            '<td>'+esc(m.typ||'')+'</td><td>'+hrs+'</td>'+
+            '<td>'+esc(m.typ||'')+'</td><td>'+fullHours(m)+'</td>'+
             '<td class="note">'+esc(m.addr||'')+' '+linksHtml(m)+'</td></tr>';
     });
     html+='</tbody></table>';
+  });
+  listview.innerHTML=html||'<p class="note">Inga träffar.</p>';
+}
+function renderListMobile(ms,regions){
+  let html='';
+  regions.forEach(r=>{
+    const rows=sortMs(ms.filter(m=>m.region===r));
+    if(!rows.length) return;
+    html+='<h2 class="section-title">'+r+' <span class="count">('+rows.length+')</span></h2>';
+    rows.forEach(m=>{
+      html+='<div class="card"><div class="cn">'+esc(m.name)+'</div>'+
+            '<div class="cmeta">'+esc(m.mun)+' · '+esc(m.typ||'')+'</div>'+
+            '<div class="chrs">'+fullHours(m)+'</div>'+
+            (m.addr?'<div class="caddr">'+esc(m.addr)+'</div>':'')+
+            (linksHtml(m)?'<div style="margin-top:6px">'+linksHtml(m)+'</div>':'')+'</div>';
+    });
   });
   listview.innerHTML=html||'<p class="note">Inga träffar.</p>';
 }
@@ -514,6 +586,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 function render(){ if(view==='week') renderWeek(); else renderList(); }
 [q,regionSel,typSel].forEach(el=>el.addEventListener('input',render));
+let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(render,150); });
 render();
 </script>
 </body>
