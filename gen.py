@@ -343,10 +343,11 @@ html_out="""<!DOCTYPE html>
 <style>
 :root{--bg:#0a1a2f;--card:#12273f;--ink:#e8f0fb;--muted:#8ba6c9;--accent:#4f9be8;--accent2:#1c3f63;--line:#26456a;}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
-header{background:linear-gradient(135deg,#0e2f56,#071426);color:#fff;padding:28px 20px;border-bottom:1px solid var(--line)}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:16px}
+header{background:linear-gradient(135deg,#0e2f56,#071426);color:#fff;padding:26px 20px;border-bottom:1px solid var(--line)}
+header h1{font-size:24px;letter-spacing:.2px}
 header h1{margin:0 0 6px;font-size:24px}
-header p{margin:0;opacity:.9;font-size:14px}
+header p{margin:0;opacity:.92;font-size:15px}
 .wrap{max-width:1280px;margin:0 auto;padding:18px 16px 60px}
 .controls{position:sticky;top:0;z-index:600;background:rgba(10,26,47,.97);backdrop-filter:blur(6px);padding:12px 0;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .controls input,.controls select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--card);color:var(--ink)}
@@ -371,7 +372,7 @@ header p{margin:0;opacity:.9;font-size:14px}
 .item .mu{color:var(--muted);font-size:11.5px}
 .badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:4px;background:#1d3c5e;color:#9fc6f2;margin-left:4px;vertical-align:middle}
 .lk{margin-left:6px;white-space:nowrap}
-.lk a{text-decoration:none;font-size:13px;margin-left:3px}
+.lk a{text-decoration:none;font-size:15px;margin-left:5px}
 .count{color:var(--muted);font-size:11px;font-weight:400}
 table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden}
 th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
@@ -379,7 +380,7 @@ th{background:#173350;color:var(--ink)}
 tr:hover td{background:#163254}
 .reg{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;background:#163254;color:#9fc6f2;margin:14px 0 6px}
 .note{color:var(--muted);font-size:12px}
-.section-title{font-size:18px;margin:22px 0 4px}
+.section-title{font-size:18px;font-weight:700;margin:26px 0 8px;padding-left:10px;border-left:4px solid var(--accent)}
 .hide{display:none}
 .legend{font-size:12px;color:var(--muted);margin:10px 0}
 .legend b{color:var(--ink)}
@@ -416,7 +417,7 @@ a{color:var(--accent)}
 <body>
 <header>
 <h1>🛋️ Loppiskalender 2026</h1>
-<p>Antikt &amp; Loppisguiden – Skåne, Blekinge, Småland &amp; Halland · """+str(len(M))+""" platser · """+str(with_days)+""" med fasta veckotider · """+str(variable)+""" med rörliga/aviserade tider</p>
+<p>När är antik- och loppisbutikerna öppna? Skåne, Blekinge, Småland &amp; Halland.</p>
 </header>
 <div class="wrap">
 <div class="controls">
@@ -435,14 +436,14 @@ a{color:var(--accent)}
   <div class="tab" data-view="list">📋 Lista</div>
 </div>
 <div class="legend">
-  <b>Veckokalendern</b> visar butiker med fasta veckoåterkommande öppettider. <span class="badge">säsong</span> = tiderna gäller viss period/har avvikelser (se lista). Butiker med endast rörliga/aviserade tider (t.ex. "se Facebook") listas separat, och de utan angivna tider under N/A. Länkar: 🌐 webbplats · 📘 Facebook · 📷 Instagram.
+  Välj <b>Veckokalender</b> för att se vilka butiker som är öppna en viss dag, eller <b>Lista</b> för alla butiker med adress och länkar. Sök och filtrera högst upp. <span class="badge">säsong</span> betyder att tiderna varierar under året – se Lista för detaljer. &nbsp;🌐 webbplats · 📘 Facebook · 📷 Instagram
 </div>
 
 <div id="weekview">
   <div class="grid" id="grid"></div>
-  <h2 class="section-title">Endast särskilda datum / rörliga tider <span class="count" id="spcount"></span></h2>
+  <h2 class="section-title">Öppet vissa datum eller enligt info på nätet <span class="count" id="spcount"></span></h2>
   <div id="specials" class="note"></div>
-  <h2 class="section-title">N/A – öppettider ej angivna i guiden <span class="count" id="nacount"></span></h2>
+  <h2 class="section-title">Öppettider saknas i guiden <span class="count" id="nacount"></span></h2>
   <div id="naEl" class="note"></div>
 </div>
 
