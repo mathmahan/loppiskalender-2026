@@ -37,6 +37,13 @@ header p{margin:0;opacity:.92;font-size:15px}
 .badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:4px;background:#1d3c5e;color:#9fc6f2;margin-left:4px;vertical-align:middle}
 .lk{margin-left:6px;white-space:nowrap}
 .lk a{text-decoration:none;font-size:15px;margin-left:5px}
+.taglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-top:8px}
+.tagcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.tagcard .tc-name{font-weight:700;font-size:15px}
+.tagcard .tc-meta{color:var(--muted);font-size:13px;margin:2px 0 3px}
+.tagcard .tc-info{font-size:14px}
+.tagcard .tc-links{margin-top:6px}
+@media(max-width:760px){.taglist{grid-template-columns:1fr}}
 .count{color:var(--muted);font-size:11px;font-weight:400}
 table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden}
 th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
@@ -106,9 +113,9 @@ a{color:var(--accent)}
 <div id="weekview">
   <div class="grid" id="grid"></div>
   <h2 class="section-title">Öppet vissa datum eller enligt info på nätet <span class="count" id="spcount"></span></h2>
-  <div id="specials" class="note"></div>
+  <div id="specials"></div>
   <h2 class="section-title">Öppettider saknas i guiden <span class="count" id="nacount"></span></h2>
-  <div id="naEl" class="note"></div>
+  <div id="naEl"></div>
 </div>
 
 <div id="listview" class="hide"></div>
@@ -166,16 +173,25 @@ function fullHours(m){
   if(!hrs) hrs='<span class="note">–</span>';
   return hrs;
 }
+function renderTagList(el, arr, builder){
+  el.innerHTML = arr.length ? '<div class="taglist">'+arr.map(m=>'<div class="tagcard">'+builder(m)+'</div>').join('')+'</div>'
+                            : '<p class="note">Inga i nuvarande filter.</p>';
+}
 
 function renderWeek(){
   const ms=sortMs(filtered());
   if(isMobile()) renderWeekMobile(ms); else renderWeekGrid(ms);
   // rolling/announced + N/A sections (shared by both layouts)
   const sp=sortMs(ms.filter(m=>!Object.keys(m.days||{}).length && !isNA(m) && (m.special||m.season)));
-  specialsEl.innerHTML = sp.length? sp.map(m=>'• <b>'+esc(m.name)+'</b> ('+esc(m.mun)+'): '+esc(m.special||m.season)+' '+linksHtml(m)).join('<br>') : 'Inga i nuvarande filter.';
+  renderTagList(specialsEl, sp, m=>'<div class="tc-name">'+esc(m.name)+'</div>'+
+    '<div class="tc-meta">'+esc(m.mun)+' · '+esc(m.typ||'')+'</div>'+
+    '<div class="tc-info">'+esc(m.special||m.season)+'</div>'+
+    (linksHtml(m)?'<div class="tc-links">'+linksHtml(m)+'</div>':''));
   spcount.textContent='('+sp.length+')';
   const na=sortMs(ms.filter(isNA));
-  naEl.innerHTML = na.length? na.map(m=>'• <b>'+esc(m.name)+'</b> ('+esc(m.mun)+' · '+esc(m.typ||'')+') '+linksHtml(m)).join('<br>') : 'Inga i nuvarande filter.';
+  renderTagList(naEl, na, m=>'<div class="tc-name">'+esc(m.name)+'</div>'+
+    '<div class="tc-meta">'+esc(m.mun)+' · '+esc(m.typ||'')+'</div>'+
+    (linksHtml(m)?'<div class="tc-links">'+linksHtml(m)+'</div>':''));
   nacount.textContent='('+na.length+')';
 }
 function renderWeekGrid(ms){
