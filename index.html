@@ -188,6 +188,37 @@ function renderTagList(el, arr, builder){
                             : '<p class="note">Inga i nuvarande filter.</p>';
 }
 
+// --- parse Swedish season text and test whether today's date falls in a listed period ---
+const SVMON={januari:1,jan:1,februari:2,feb:2,mars:3,mar:3,april:4,apr:4,maj:5,juni:6,jun:6,juli:7,jul:7,augusti:8,aug:8,september:9,sept:9,sep:9,oktober:10,okt:10,november:11,nov:11,december:12,dec:12};
+const MLAST=[0,31,29,31,30,31,30,31,31,30,31,30,31];
+const MONWORD=Object.keys(SVMON).sort((a,b)=>b.length-a.length).join('|');
+function mval(mm,dd){ return mm*100+dd; }
+function parsePoint(str,isEnd){
+  str=str.trim().toLowerCase().replace(/[.]/g,''); let m;
+  if(m=str.match(new RegExp('^([0-9]{1,2}) *[/] *([0-9]{1,2})$'))) return {m:+m[2],d:+m[1]};
+  if(m=str.match(new RegExp('^([0-9]{1,2}) +('+MONWORD+')$'))) return {m:SVMON[m[2]],d:+m[1]};
+  if(m=str.match(new RegExp('^('+MONWORD+')$'))) { const mo=SVMON[m[1]]; return {m:mo,d:isEnd?MLAST[mo]:1}; }
+  return null;
+}
+function rangeCovers(a,b,tv){ const s=mval(a.m,a.d),e=mval(b.m,b.d); return s<=e ? (tv>=s&&tv<=e) : (tv>=s||tv<=e); }
+function seasonCoversToday(txt){
+  if(!txt) return false;
+  const now=new Date(), tv=mval(now.getMonth()+1, now.getDate());
+  const PT='([0-9]{1,2} *[/] *[0-9]{1,2}|[0-9]{1,2} +(?:'+MONWORD+')|(?:'+MONWORD+'))';
+  const re=new RegExp(PT+' *[-–—] *'+PT,'gi');
+  let m, any=false;
+  while(m=re.exec(txt)){
+    any=true;
+    const a=parsePoint(m[1],false), b=parsePoint(m[2],true);
+    if(a&&b&&a.m&&b.m&&rangeCovers(a,b,tv)) return true;
+  }
+  if(!any){ // no explicit range: try a month list like "juni, juli & augusti"
+    const toks=txt.toLowerCase().split(/[^a-zåäö]+/).map(w=>SVMON[w]).filter(Boolean);
+    if(toks.length>=2 && toks.includes(now.getMonth()+1)) return true;
+  }
+  return false;
+}
+
 function renderWeek(){
   const ms=sortMs(filtered());
   if(isMobile()) renderWeekMobile(ms); else renderWeekGrid(ms);
@@ -284,7 +315,20 @@ function renderToday(){
   } else {
     html+='<p class="note">Inga butiker med fasta öppettider idag.</p>';
   }
-  html+='<p class="note" style="margin-top:16px">Obs: butiker med säsongs- eller rörliga tider kan också vara öppna – se <b>Veckokalender</b> och <b>Lista</b>.</p>';
+  // "possibly open": seasonal shops whose period covers today but that aren't in the confirmed list
+  const possibly=sortMs(filtered().filter(m=> !(m.days&&m.days[key]) && seasonCoversToday(m.season)));
+  html+='<h2 class="section-title">Kanske öppet idag – säsong <span class="count">('+possibly.length+')</span></h2>'+
+        '<p class="note">Butiker vars säsong täcker dagens datum. Öppettiderna varierar (t.ex. bara helger) – läs texten och kontrollera gärna innan besök.</p>';
+  if(possibly.length){
+    html+='<div class="taglist">'+possibly.map(m=>'<div class="tagcard">'+
+      '<div class="tc-name">'+esc(m.name)+'</div>'+
+      '<div class="tc-meta">'+esc(m.mun)+' · '+esc(m.region)+' · '+esc(m.typ||'')+'</div>'+
+      '<div class="tc-info">'+esc(m.season)+'</div>'+
+      (linksHtml(m)?'<div class="tc-links">'+linksHtml(m)+'</div>':'')+'</div>').join('')+'</div>';
+  } else {
+    html+='<p class="note">Inga säsongsbutiker med period som täcker idag.</p>';
+  }
+  html+='<p class="note" style="margin-top:16px">Butiker med rörliga/aviserade tider (t.ex. "se Facebook") kan också vara öppna – se <b>Lista</b>.</p>';
   todayview.innerHTML=html;
 }
 
