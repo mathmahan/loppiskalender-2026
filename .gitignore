@@ -1,6 +1,11 @@
 # Source magazine (copyrighted) — kept local, not published
 Antikt-och-loppisguiden-2026.pdf
 
+# Geocoding working files (coordinates.csv is the committed result)
+addresses.csv
+addresses.csv.kml
+loppis-mymaps.csv
+
 # OS / tooling
 .DS_Store
 .claude/
