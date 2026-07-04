@@ -2,30 +2,21 @@
 
 Features intentionally postponed. Pick up here when revisiting the project.
 
-## 1. Map view (with "My Location" + distance sorting) — REMOVED, to redo
+## 1. Map view (with "My Location" + distance sorting) — ✅ DONE (v0.6.0)
 
-**Status:** Removed 2026-07-01. Was showing pins in the wrong places.
+Implemented 2026-07-04. Real coordinates were obtained by geocoding each shop's
+street address (Nominatim, with cleaned queries + a southern-Sweden bounding box).
+Results live in `coordinates.csv` (`num,lat,lng,approx,address`) and are read by
+`gen.py` at build time. The **Karta** tab shows Leaflet markers (keyless CARTO
+`dark_all` basemap) with popups; **📍 Min plats** / ort-search set a reference point
+for **sort-by-distance** + distance chips across the views.
 
-**Why it was wrong:** The guide's PDF has no coordinates (only two entries printed
-GPS). I approximated each place's lat/lng from the town/village name via a hand-built
-lookup table + jitter. That put many pins in the wrong spot, and — because the
-"My Location" / sort-by-distance feature used the same coordinates — distances were
-unreliable too. So the whole location feature set was pulled, not just the map.
-
-**What's needed to do it properly:**
-- Real geocoding of each entry's street address (not just the town). Options:
-  - Batch-geocode the 182 addresses once (e.g. Nominatim/Google/Mapbox), review the
-    results by hand, and bake verified `lat`/`lng` into the data in `gen.py`.
-  - Flag low-confidence hits (village-only / rural addresses) for manual correction.
-- Then re-add:
-  - Leaflet map tab with markers + popups (keyless dark basemap, e.g. CARTO
-    `dark_all`, which worked from `file://`).
-  - "📍 Min plats" (browser geolocation; note it's blocked over `file://` — needs a
-    local server or hosting) + an ort-search fallback via geocoding.
-  - Sort-by-distance + distance chips in week/list views.
-
-**Note:** the link icons (🌐/📘/📷), dark-blue theme, week grid, list view, and the
-N/A section are all still in place — only the location/map parts were removed.
-
-The generator lives in the scratchpad `gen.py`; the previous map implementation is in
-this conversation's history if useful as a starting point.
+### Remaining refinement (optional)
+- **36 shops are `approx=1`** (town-level only) — geocoding couldn't resolve them to a
+  street, so their pin sits at the town center and is drawn as a hollow marker. To
+  tighten: open them in Google My Maps, drag each pin to the right spot, export KML,
+  and update the `lat`/`lng`/`approx` for those rows in `coordinates.csv`. List them
+  with: `awk -F, '$4==1' coordinates.csv`.
+- Geolocation ("📍 Min plats") needs a secure context — works on the GitHub Pages URL,
+  but a browser may block it when opening `index.html` directly as `file://` (the
+  ort-search box is the fallback there).

@@ -3,8 +3,10 @@
 En enkel, mobilvänlig kalender över antik- och loppisbutiker i **Skåne, Blekinge,
 Småland & Halland**, baserad på *Antikt och Loppisguiden 2026*.
 
+- **Öppna idag** – butiker som är öppna just idag (+ "kanske öppet" för säsongsbutiker).
 - **Veckokalender** – se vilka butiker som är öppna varje veckodag.
 - **Lista** – alla butiker med öppettider, adress och länkar (🌐 webbplats · 📘 Facebook · 📷 Instagram).
+- **Karta** – var butikerna ligger. "📍 Min plats" eller ortsökning sorterar efter avstånd.
 - Sök och filtrera på kommun/region och typ (antikt, loppis, café, auktion).
 
 Butiker utan fasta veckotider visas separat (rörliga/aviserade tider), och de som saknar
@@ -39,6 +41,7 @@ funktion.
 | Fil | Beskrivning |
 | --- | --- |
 | `gen.py` | Generator – data, CSS och JS. Enda filen med logik. |
+| `coordinates.csv` | Koordinater per butik (`num,lat,lng,approx,address`), geokodade från adress. Läses av `gen.py`. |
 | `index.html` | Genererad sida (publiceras). |
 | `DEFERRED.md` | Backlogg (bl.a. kartfunktionen som pausats). |
 | `Antikt-och-loppisguiden-2026.pdf` | Källa (lokal, ej i git – upphovsrättsskyddad). |

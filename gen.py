@@ -324,6 +324,25 @@ for m in M:
     lk={k:v for k,v in LINKS.get(m["num"],{}).items() if v}
     m["links"]=lk
 
+# ---------------- coordinates (from coordinates.csv, geocoded from addresses) ----------------
+import os, csv as _csv
+_COORDS={}
+_cpath=os.path.join(os.path.dirname(os.path.abspath(__file__)),"coordinates.csv")
+_ADDR={}
+if os.path.exists(_cpath):
+    for _r in _csv.DictReader(open(_cpath,encoding="utf-8")):
+        try: _COORDS[int(_r["num"])]=(float(_r["lat"]),float(_r["lng"]),_r.get("approx","0")=="1")
+        except (ValueError,KeyError): pass
+        _a=(_r.get("address") or "").strip()
+        if _a:
+            try: _ADDR[int(_r["num"])]=_a
+            except (ValueError,KeyError): pass
+for m in M:
+    c=_COORDS.get(m["num"])
+    m["lat"],m["lng"],m["approx"]=(c[0],c[1],c[2]) if c else (None,None,False)
+    if _ADDR.get(m["num"]): m["addr"]=_ADDR[m["num"]]  # prefer geocoded/verified address
+geo_ok=sum(1 for m in M if m["lat"] is not None)
+
 # ---------------- generate HTML ----------------
 WD=[("mon","Måndag"),("tue","Tisdag"),("wed","Onsdag"),("thu","Torsdag"),("fri","Fredag"),("sat","Lördag"),("sun","Söndag")]
 TYPE_LABEL={"A":"Antikt/Design/Retro/Vintage","L":"Loppis/Second hand","Au":"Auktionsfirma","C":"Café","BB":"Bed & Breakfast"}
@@ -340,6 +359,8 @@ html_out="""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Loppiskalender 2026 – Skåne, Blekinge, Småland & Halland</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{--bg:#0a1a2f;--card:#12273f;--ink:#e8f0fb;--muted:#8ba6c9;--accent:#4f9be8;--accent2:#1c3f63;--line:#26456a;}
 *{box-sizing:border-box}
@@ -425,7 +446,18 @@ a{color:var(--accent)}
   .item .hr{font-size:13px}
   .item .mu{font-size:12px}
   .section-title{font-size:17px}
+  #geo,#geosearch,#place,#sort{flex:1 1 100%;width:100%;min-height:46px;font-size:16px}
+  #map{height:64vh}
 }
+.btn{padding:8px 12px;border:1px solid var(--accent);border-radius:8px;font-size:14px;background:var(--accent);color:#04121f;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+#locstatus{font-size:12px;color:var(--muted);flex-basis:100%}
+.dist{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:10px;background:#123b2e;color:#7fe0b0;margin-left:4px;font-weight:600;vertical-align:middle}
+#map{height:70vh;min-height:420px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.maphint{font-size:12px;color:var(--muted);margin:10px 0 0}
+.leaflet-popup-content{font-size:13px;line-height:1.45;color:#12263f}
+.leaflet-popup-content b{color:#0a1a2f}
+.leaflet-popup-content a{margin-left:4px;text-decoration:none}
 </style>
 </head>
 <body>
@@ -444,14 +476,23 @@ a{color:var(--accent)}
     <option value="C">Café</option>
     <option value="Au">Auktion</option>
   </select>
+  <select id="sort">
+    <option value="mun">Sortera: kommun</option>
+    <option value="dist">Sortera: närmast mig</option>
+  </select>
+  <button id="geo" class="btn">📍 Min plats</button>
+  <input id="place" placeholder="…eller skriv en ort">
+  <button id="geosearch" class="btn ghost">Sök ort</button>
+  <span id="locstatus">Tips: tryck ”📍 Min plats” (eller skriv en ort) för att sortera efter avstånd och se dig själv på kartan.</span>
 </div>
 <div class="tabs">
   <div class="tab active" data-view="today">☀️ Öppna idag</div>
   <div class="tab" data-view="week">📅 Veckokalender</div>
   <div class="tab" data-view="list">📋 Lista</div>
+  <div class="tab" data-view="map">🗺️ Karta</div>
 </div>
 <div class="legend">
-  <b>Öppna idag</b> visar butiker som är öppna just idag. <b>Veckokalender</b> visar en vald veckodag och <b>Lista</b> alla butiker med adress och länkar. Sök och filtrera högst upp. <span class="badge">säsong</span> betyder att tiderna varierar under året – se Lista för detaljer. &nbsp;🌐 webbplats · 📘 Facebook · 📷 Instagram
+  <b>Öppna idag</b> visar butiker som är öppna just idag. <b>Veckokalender</b> visar en vald veckodag, <b>Lista</b> alla butiker och <b>Karta</b> var de ligger. Sök och filtrera högst upp. <span class="badge">säsong</span> = tiderna varierar under året. &nbsp;🌐 webbplats · 📘 Facebook · 📷 Instagram
 </div>
 
 <div id="todayview"></div>
@@ -466,19 +507,33 @@ a{color:var(--accent)}
 
 <div id="listview" class="hide"></div>
 
+<div id="mapview" class="hide">
+  <div id="map"></div>
+  <p class="maphint">📍-markörer visar butikernas läge (från adress). Ihåliga markörer = ungefärligt läge (endast ort). Tryck på en markör för öppettider och länkar.</p>
+</div>
+
 </div>
 <script>
 const DATA = """+data_json+""";
 const WD = """+json.dumps(WD,ensure_ascii=False)+""";
 const TYPE_LABEL = """+json.dumps(TYPE_LABEL,ensure_ascii=False)+""";
 
-const q=document.getElementById('q'), regionSel=document.getElementById('region'), typSel=document.getElementById('typ');
+const q=document.getElementById('q'), regionSel=document.getElementById('region'), typSel=document.getElementById('typ'), sortSel=document.getElementById('sort');
 const grid=document.getElementById('grid'), specialsEl=document.getElementById('specials'), listview=document.getElementById('listview');
 const naEl=document.getElementById('naEl'), spcount=document.getElementById('spcount'), nacount=document.getElementById('nacount');
-const weekview=document.getElementById('weekview'), todayview=document.getElementById('todayview');
+const weekview=document.getElementById('weekview'), todayview=document.getElementById('todayview'), mapview=document.getElementById('mapview');
+const placeInput=document.getElementById('place'), locstatus=document.getElementById('locstatus');
+
+let refPt=null, refLabel='';
+let map=null, markersLayer=null;
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function matchType(m,t){if(!t)return true;return (m.typ||'').split('/').includes(t);}
+function toRad(d){return d*Math.PI/180;}
+function haversine(a,b){const R=6371,dLat=toRad(b[0]-a[0]),dLon=toRad(b[1]-a[1]);const s=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
+function distOf(m){ if(!refPt||m.lat==null) return null; return haversine(refPt,[m.lat,m.lng]); }
+function fmtDist(km){ if(km==null) return ''; return km<1? Math.round(km*1000)+' m' : km.toFixed(km<10?1:0)+' km'; }
+function distChip(m){ const d=distOf(m); return d!=null? ' <span class="dist">'+fmtDist(d)+'</span>' : ''; }
 function isNA(m){ return !Object.keys(m.days||{}).length && !m.season && (!m.special || /ej\s+(tydligt\s+)?angivna/i.test(m.special)); }
 function linksHtml(m){
   const L=m.links||{}; let s='';
@@ -497,7 +552,12 @@ function filtered(){
     return true;
   });
 }
-function sortMs(ms){ return ms.slice().sort((a,b)=>a.mun.localeCompare(b.mun,'sv')||a.num-b.num); }
+function sortMs(ms){
+  if(sortSel.value==='dist' && refPt){
+    return ms.slice().sort((a,b)=>{const da=distOf(a),db=distOf(b); if(da==null)return 1; if(db==null)return -1; return da-db;});
+  }
+  return ms.slice().sort((a,b)=>a.mun.localeCompare(b.mun,'sv')||a.num-b.num);
+}
 function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
 
 // weekday of "today" -> our key order (JS getDay: 0=Sun..6=Sat)
@@ -505,7 +565,7 @@ const DAYMAP=['sun','mon','tue','wed','thu','fri','sat'];
 let selectedDay=DAYMAP[new Date().getDay()];
 
 function openItemHtml(m,key){
-  return '<div class="item"><div class="nm">'+esc(m.name)+(m.season?' <span class="badge">säsong</span>':'')+'</div>'+
+  return '<div class="item"><div class="nm">'+esc(m.name)+(m.season?' <span class="badge">säsong</span>':'')+distChip(m)+'</div>'+
          '<div class="hr">'+esc(m.days[key])+'</div>'+
          '<div class="mu">'+esc(m.mun)+' · '+esc(m.region)+linksHtml(m)+'</div></div>';
 }
@@ -609,7 +669,7 @@ function renderListDesktop(ms,regions){
     html+='<h2 class="section-title">'+r+' <span class="count">('+rows.length+')</span></h2>';
     html+='<table><thead><tr><th>#</th><th>Butik</th><th>Kommun</th><th>Typ</th><th>Öppettider</th><th>Adress / länkar</th></tr></thead><tbody>';
     rows.forEach(m=>{
-      html+='<tr><td>'+m.num+'</td><td><b>'+esc(m.name)+'</b></td><td>'+esc(m.mun)+'</td>'+
+      html+='<tr><td>'+m.num+'</td><td><b>'+esc(m.name)+'</b>'+distChip(m)+'</td><td>'+esc(m.mun)+'</td>'+
             '<td>'+esc(m.typ||'')+'</td><td>'+fullHours(m)+'</td>'+
             '<td class="note">'+esc(m.addr||'')+' '+linksHtml(m)+'</td></tr>';
     });
@@ -624,7 +684,7 @@ function renderListMobile(ms,regions){
     if(!rows.length) return;
     html+='<h2 class="section-title">'+r+' <span class="count">('+rows.length+')</span></h2>';
     rows.forEach(m=>{
-      html+='<div class="card"><div class="cn">'+esc(m.name)+'</div>'+
+      html+='<div class="card"><div class="cn">'+esc(m.name)+distChip(m)+'</div>'+
             '<div class="cmeta">'+esc(m.mun)+' · '+esc(m.typ||'')+'</div>'+
             '<div class="chrs">'+fullHours(m)+'</div>'+
             (m.addr?'<div class="caddr">'+esc(m.addr)+'</div>':'')+
@@ -643,7 +703,7 @@ function renderToday(){
            '<div class="th-sub">'+esc(dateStr)+' · '+open.length+' butiker öppna med fasta tider</div></div>';
   if(open.length){
     html+='<div class="todaygrid">'+open.map(m=>
-      '<div class="card"><div class="cn">'+esc(m.name)+(m.season?'<span class="cbadge">säsong</span>':'')+'</div>'+
+      '<div class="card"><div class="cn">'+esc(m.name)+(m.season?'<span class="cbadge">säsong</span>':'')+distChip(m)+'</div>'+
       '<div class="cmeta">'+esc(m.mun)+' · '+esc(m.region)+' · '+esc(m.typ||'')+'</div>'+
       '<div class="chrs"><span class="big">'+esc(m.days[key])+'</span></div>'+
       (m.addr?'<div class="caddr">'+esc(m.addr)+'</div>':'')+
@@ -668,6 +728,67 @@ function renderToday(){
   todayview.innerHTML=html;
 }
 
+function hoursSummary(m){
+  const dk=Object.keys(m.days||{});
+  if(dk.length) return WD.filter(([k])=>m.days[k]).map(([k,l])=>l.slice(0,3)+' '+m.days[k]).join(', ');
+  return m.season||m.special||'Se länk/annons';
+}
+function ensureMap(){
+  if(map) return;
+  map=L.map('map',{scrollWheelZoom:true}).setView([56.6,13.7],7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
+  markersLayer=L.layerGroup().addTo(map);
+}
+function renderMap(){
+  ensureMap();
+  const ms=sortMs(filtered().filter(m=>m.lat!=null));
+  markersLayer.clearLayers();
+  const pts=[];
+  ms.forEach(m=>{
+    const d=distOf(m);
+    const pop='<b>'+esc(m.name)+'</b><br>'+esc(m.mun)+' · '+esc(m.typ||'')+(d!=null?' · <b>'+fmtDist(d)+'</b>':'')+
+      '<br>'+esc(hoursSummary(m))+(m.addr?'<br><span style="color:#556">'+esc(m.addr)+(m.approx?' (ungefärligt läge)':'')+'</span>':'')+
+      (linksHtml(m)?'<br>'+linksHtml(m):'');
+    const mk = m.approx
+      ? L.circleMarker([m.lat,m.lng],{radius:6,color:'#4f9be8',weight:2,fillColor:'#0a1a2f',fillOpacity:.6})
+      : L.circleMarker([m.lat,m.lng],{radius:6,color:'#4f9be8',weight:2,fillColor:'#4f9be8',fillOpacity:.9});
+    mk.bindPopup(pop); markersLayer.addLayer(mk); pts.push([m.lat,m.lng]);
+  });
+  if(refPt){
+    markersLayer.addLayer(L.circleMarker(refPt,{radius:9,color:'#ffd54a',weight:3,fillColor:'#ffd54a',fillOpacity:.9}).bindPopup('📍 '+esc(refLabel||'Min plats')));
+    pts.push(refPt);
+  }
+  if(pts.length) map.fitBounds(pts,{padding:[30,30],maxZoom:13});
+  setTimeout(()=>map.invalidateSize(),120);
+}
+
+function setRef(lat,lng,label){
+  refPt=[lat,lng]; refLabel=label||'Min plats';
+  locstatus.innerHTML='📍 <b>'+esc(refLabel)+'</b> vald – sorterar efter avstånd.';
+  if(sortSel.value!=='dist') sortSel.value='dist';
+  render();
+}
+document.getElementById('geo').onclick=()=>{
+  locstatus.textContent='Hämtar din plats…';
+  if(!navigator.geolocation){ locstatus.textContent='Platstjänst stöds ej – skriv en ort istället.'; return; }
+  navigator.geolocation.getCurrentPosition(
+    p=>setRef(p.coords.latitude,p.coords.longitude,'Min plats'),
+    e=>{ locstatus.textContent='Kunde ej hämta plats ('+e.message+'). Skriv en ort istället.'; },
+    {enableHighAccuracy:true,timeout:9000});
+};
+async function geocodePlace(){
+  const t=placeInput.value.trim(); if(!t) return;
+  locstatus.textContent='Söker ”'+t+'”…';
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=se&q='+encodeURIComponent(t));
+    const j=await r.json();
+    if(j.length) setRef(parseFloat(j[0].lat),parseFloat(j[0].lon),t);
+    else locstatus.textContent='Hittade ingen plats för ”'+t+'”.';
+  }catch(e){ locstatus.textContent='Ortsökning misslyckades (kräver internet).'; }
+}
+document.getElementById('geosearch').onclick=geocodePlace;
+placeInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); geocodePlace(); }});
+
 let view='today';
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -675,10 +796,11 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   todayview.classList.toggle('hide',view!=='today');
   weekview.classList.toggle('hide',view!=='week');
   listview.classList.toggle('hide',view!=='list');
+  mapview.classList.toggle('hide',view!=='map');
   render();
 });
-function render(){ if(view==='today') renderToday(); else if(view==='week') renderWeek(); else renderList(); }
-[q,regionSel,typSel].forEach(el=>el.addEventListener('input',render));
+function render(){ if(view==='today') renderToday(); else if(view==='week') renderWeek(); else if(view==='list') renderList(); else renderMap(); }
+[q,regionSel,typSel,sortSel].forEach(el=>el.addEventListener('input',render));
 let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(render,150); });
 render();
 </script>
