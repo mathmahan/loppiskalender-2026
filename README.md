@@ -3,7 +3,8 @@
 En enkel, mobilvänlig kalender över antik- och loppisbutiker i **Skåne, Blekinge,
 Småland & Halland**, baserad på *Antikt och Loppisguiden 2026*.
 
-- **Öppna idag** – butiker som är öppna just idag (+ "kanske öppet" för säsongsbutiker).
+- **Öppna idag** – butiker som är öppna just idag på en tidslinje (schema) så du ser
+  när var och en är öppen (+ "kanske öppet" för säsongsbutiker).
 - **Veckokalender** – se vilka butiker som är öppna varje veckodag.
 - **Lista** – alla butiker med öppettider, adress och länkar (🌐 webbplats · 📘 Facebook · 📷 Instagram).
 - **Karta** – var butikerna ligger. "📍 Min plats" eller ortsökning sorterar efter avstånd.
