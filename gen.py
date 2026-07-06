@@ -370,7 +370,8 @@ header h1{font-size:24px;letter-spacing:.2px}
 header h1{margin:0 0 6px;font-size:24px}
 header p{margin:0;opacity:.92;font-size:15px}
 .wrap{max-width:1280px;margin:0 auto;padding:18px 16px 60px}
-.controls{position:sticky;top:0;z-index:600;background:rgba(10,26,47,.97);backdrop-filter:blur(6px);padding:12px 0;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.controls{position:sticky;top:0;z-index:600;background:rgba(10,26,47,.97);backdrop-filter:blur(6px);padding:12px 0;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;align-items:center;transition:transform .25s ease}
+.controls.up{transform:translateY(-100%)}
 .controls input,.controls select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--card);color:var(--ink)}
 .controls input::placeholder{color:var(--muted)}
 #q{flex:1;min-width:180px}
@@ -852,6 +853,7 @@ document.getElementById('geosearch').onclick=geocodePlace;
 placeInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); geocodePlace(); }});
 
 let view='today';
+const controlsEl=document.querySelector('.controls');
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); view=t.dataset.view;
@@ -859,8 +861,18 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   weekview.classList.toggle('hide',view!=='week');
   listview.classList.toggle('hide',view!=='list');
   mapview.classList.toggle('hide',view!=='map');
+  controlsEl.classList.remove('up');
   render();
 });
+// On "Öppna idag": hide the search/filter bar when scrolling down, reveal on scroll up.
+let lastY=window.scrollY;
+window.addEventListener('scroll',()=>{
+  const y=window.scrollY;
+  if(view!=='today'){ controlsEl.classList.remove('up'); lastY=y; return; }
+  if(y>lastY && y>controlsEl.offsetHeight) controlsEl.classList.add('up');
+  else if(y<lastY) controlsEl.classList.remove('up');
+  lastY=y;
+},{passive:true});
 function render(){ if(view==='today') renderToday(); else if(view==='week') renderWeek(); else if(view==='list') renderList(); else renderMap(); }
 [q,regionSel,typSel,sortSel].forEach(el=>el.addEventListener('input',render));
 let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(render,150); });
